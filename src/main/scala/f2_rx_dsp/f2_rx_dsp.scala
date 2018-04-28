@@ -12,16 +12,27 @@ import f2_decimator._
 import f2_rx_path._
 import prog_delay._
 
+
 //Consider using "unit" instead of "User" 
 class usersigs (val n: Int, val users: Int=4) extends Bundle {
     val udata=DspComplex(SInt(n.W), SInt(n.W))
     val uindex=UInt(log2Ceil(users).W)
 }
 
-class iofifosigs(val n: Int, val antennas: Int=4, val users: Int=4 ) extends Bundle {
+class iofifosigs(val n: Int, val users: Int=4 ) extends Bundle {
         //4=Users
         val data=Vec(users,new usersigs(n=n,users=users))
         val rxindex=UInt(2.W)
+}
+
+//constants
+class usersigzeros(val n: Int, val users: Int=4) extends Bundle { 
+    val userzero   = 0.U.asTypeOf(new usersigs(n=n,users=users))
+    val udatazero  = 0.U.asTypeOf(userzero.data)
+    val uindexzero = 0.U.asTypeOf(userzero.uindex)
+    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n))
+    val datazero   = 0.U.asTypeOf(iofifozero.data)
+    val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
 }
 
 class f2_rx_dsp_io(
@@ -53,7 +64,7 @@ class f2_rx_dsp_io(
     val adc_lut_write_vals = Input(Vec(antennas,DspComplex(SInt(inputn.W), SInt(inputn.W))))
     val adc_lut_write_en   = Input(Bool())
     val ofifo              = DecoupledIO(new iofifosigs(n=n))
-    val iptr_fifo          = Vec(neighbours,Flipped(DecoupledIO(new iofifosigs(n=n,users=users,antennas=antennas))))
+    val iptr_fifo          = Vec(neighbours,Flipped(DecoupledIO(new iofifosigs(n=n,users=users))))
     val rx_path_delays     = Input(Vec(antennas, Vec(users,UInt(log2Ceil(progdelay).W))))
     val neighbour_delays   = Input(Vec(neighbours, Vec(users,UInt(log2Ceil(progdelay).W))))
 }
@@ -78,14 +89,13 @@ class f2_rx_dsp (
         )
     )
     //Zeros
+    //val z = new usersigzeros(n=n, users=users)
     val userzero   = 0.U.asTypeOf(new usersigs(n=n,users=users))
     val udatazero  = 0.U.asTypeOf(userzero.data)
     val uindexzero = 0.U.asTypeOf(userzero.uindex)
     val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n))
     val datazero   = 0.U.asTypeOf(iofifozero.data)
     val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
-
-    val compzero=udatazero
     //-The RX:s
     // Vec is required to do runtime adressing of an array i.e. Seq is not hardware structure
     val rx_path  = VecInit(Seq.fill(antennas){ 
