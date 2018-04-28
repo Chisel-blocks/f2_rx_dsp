@@ -111,11 +111,9 @@ class f2_rx_dsp (
     }
     
     //Assign selects
-    for ( i<-0 to neighbours-1){
-        for ( k <- 0 to users-1){
-            r_iptr_fifo(i)(k).select:=io.neighbour_delays(i)(k)
-        }
-    }
+    //Thi is the way to zip-map 2 dimensional arrays
+    (r_iptr_fifo,io.neighbour_delays).zipped.map{ case(x,y)=> (x,y).zipped.map(_.select:=_)}
+
     val zero :: userssum :: Nil = Enum(2)
     val inputmode=RegInit(zero)
     
@@ -141,9 +139,7 @@ class f2_rx_dsp (
 
     for (i <- 0 to neighbours-1) {
         when ( (infifo(i).deq.valid) && (inputmode===userssum)) {
-            for ( k <- 0 to users-1) { 
-                r_iptr_fifo(i)(k).iptr_A:=infifo(i).deq.bits.data(k)
-            }
+            (r_iptr_fifo(i),infifo(i).deq.bits.data).zipped.map(_.iptr_A:=_)
         } .elsewhen ( inputmode===zero ) {
             r_iptr_fifo(i).map(_.iptr_A:=compzero) 
         } .otherwise {
@@ -175,7 +171,7 @@ class f2_rx_dsp (
                 (usrleft,usrright)=> usrleft+usrright
             )
     }
-
+ 
     //Sum neighbours to this receiver
     for (user <-0 to users-1){ 
         sumusersstream(user):=rx_path.map( 
