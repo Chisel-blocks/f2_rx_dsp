@@ -71,9 +71,14 @@ class f2_rx_dsp (
             progdelay=progdelay
         )
     )
-    val compzero=0.U.asTypeOf(DspComplex.wire(0.S(n.W), 0.S(n.W)))
-    val iozerovec=VecInit(Seq.fill(4)(compzero))
-    val iofifozerovec = 0.U.asTypeOf(new iofifosigs(n=n))
+    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n))
+    //val compzero=0.U.asTypeOf(DspComplex.wire(0.S(n.W), 0.S(n.W)))
+    //val datazero=VecInit(Seq.fill(4)(compzero))
+    val datazero = 0.U.asTypeOf(iofifozero.data)
+    val indexzero = 0.U.asTypeOf(iofifozero.index)
+    val userdatazero = 0.U.asTypeOf(iofifozero.data(0))
+    val compzero=userdatazero
+    val iozerovec=datazero
     //-The RX:s
     // Vec is required to do runtime adressing of an array i.e. Seq is not hardware structure
     val rx_path  = VecInit(Seq.fill(antennas){ 
@@ -133,34 +138,32 @@ class f2_rx_dsp (
         inputmode:=zero
         infifo.map(_.deq.ready:=false.B)
     }
-   //--Serdes Injli
-   //
-   //put fifo ends here
+   //Output fifo ends here
 
     for (i <- 0 to neighbours-1) {
         when ( (infifo(i).deq.valid) && (inputmode===userssum)) {
             (r_iptr_fifo(i),infifo(i).deq.bits.data).zipped.map(_.iptr_A:=_)
         } .elsewhen ( inputmode===zero ) {
-            r_iptr_fifo(i).map(_.iptr_A:=compzero) 
+            r_iptr_fifo(i).map(_.iptr_A:=userdatazero) 
         } .otherwise {
-            r_iptr_fifo(i).map(_.iptr_A:=compzero)
+            r_iptr_fifo(i).map(_.iptr_A:=userdatazero)
         }
     }
  
-    //(r_iptr_fifo,io.neighbour_delays).zipped.map(_.select<>_
-    //This is a 4 element receiver array, later to be concatenated to a bitvector
-    val w_Z=  Wire(Vec(4,DspComplex(SInt(n.W), SInt(n.W))))
-    val w_index=  Wire(UInt(2.W))
+    //This is a 4 element receiver array, 
+    //val w_Z=  Wire(Vec(4,DspComplex(SInt(n.W), SInt(n.W))))
+    //val w_index=  Wire(UInt(2.W))
+    val w_Z = Wire( new iofifosigs(n=n))
 
     // First we generate all possible output signals, then we just select The one we want.
     //Generate the sum of users
     
     val sumusersstream = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
-        RegInit(VecInit(Seq.fill(users)(DspComplex.wire(0.S(n.W), 0.S(n.W)))))
+        RegInit(VecInit(Seq.fill(users)(userdatazero)))
 
     )
     val sumneighbourstream = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
-        RegInit(VecInit(Seq.fill(users)(DspComplex.wire(0.S(n.W), 0.S(n.W)))))
+        RegInit(VecInit(Seq.fill(users)(userdatazero)))
     )
     
     //Sum the inputs from neighbours
@@ -184,19 +187,19 @@ class f2_rx_dsp (
   
     //All antennas, single user
     val seluser = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
-        RegInit(VecInit(Seq.fill(antennas)(DspComplex.wire(0.S(n.W), 0.S(n.W)))))
+        RegInit(VecInit(Seq.fill(antennas)(userdatazero)))
     )
     (seluser,rx_path).zipped.map(_:=_.Z(io.user_index)) 
 
     //All users, single antenna
     val selrx = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
-        RegInit(VecInit(Seq.fill(users)(DspComplex.wire(0.S(n.W), 0.S(n.W)))))
+        RegInit(VecInit(Seq.fill(users)(userdatazero)))
     )
     (selrx,rx_path(io.antenna_index).Z).zipped.map(_:=_) 
 
     //Single users, single antenna
     val selrxuser = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
-        RegInit(DspComplex.wire(0.S(n.W), 0.S(n.W))))
+        RegInit(userdatazero))
     selrxuser:=rx_path(io.antenna_index).Z(io.user_index)
   
 
@@ -216,13 +219,13 @@ class f2_rx_dsp (
   
     // Indexed user stream
     val indexeduserstream = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(
-        RegInit(VecInit(Seq.fill(4)(DspComplex.wire(0.S(n.W), 0.S(n.W)))))
+        RegInit(datazero)
     )
     (indexeduserstream,rx_path).zipped.map(_:=_.Z(index))
 
     // Indexed RX stream
     val indexedrxstream = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(
-        RegInit(VecInit(Seq.fill(4)(DspComplex.wire(0.S(n.W), 0.S(n.W)))))
+        RegInit(datazero)
     )
     (indexedrxstream,rx_path(index).Z).zipped.map(_:=_)
 
@@ -263,11 +266,11 @@ class f2_rx_dsp (
     outfifo.deq_reset:=io.reset_outfifo
     outfifo.deq.ready:=io.ofifo.ready
     outfifo.deq_clock:=io.clock_outfifo_deq
-    w_index := withClock(io.clock_symrate)(RegNext(0.U))
+    w_Z.index := withClock(io.clock_symrate)(RegNext(0.U))
     io.ofifo.valid   := outfifo.deq.valid
 
     //Put something out if nothig else defined
-    (w_Z,rx_path).zipped.map(_:=_.Z(0))
+    (w_Z.data,rx_path).zipped.map(_:=_.Z(0))
 
     //Clock multiplexing does not work. Use valid to control output rate.
     val validcount  = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegInit(0.U(2.W)))
@@ -295,48 +298,46 @@ class f2_rx_dsp (
 
 
     //Mode operation definitions
+    // Clean this up using outfifosig
     switch(mode) {
         is(bypass) {
-            (w_Z,rx_path).zipped.map(_:=_.Z(0))
-            w_index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(0.U))
+            (w_Z.data,rx_path).zipped.map(_:=_.Z(0))
+            w_Z.index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(0.U))
         }
         is(select_users) {
-            (w_Z,seluser).zipped.map(_:=_)
-            w_index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(io.user_index))
+            (w_Z.data,seluser).zipped.map(_:=_)
+            w_Z.index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(io.user_index))
         }
         is(select_antennas) {
-           (w_Z,selrx).zipped.map(_:=_)
-            w_index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(io.antenna_index))
+           (w_Z.data,selrx).zipped.map(_:=_)
+            w_Z.index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(io.antenna_index))
         }
         is(select_both) {
-            (w_Z,Seq(selrxuser)++Seq.fill(3)(DspComplex.wire(0.S,0.S))).zipped.map(_:=_)
-            w_index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(0.U))
+            (w_Z.data,Seq(selrxuser)++Seq.fill(3)(DspComplex.wire(0.S,0.S))).zipped.map(_:=_)
+            w_Z.index := withClockAndReset(io.clock_symrate,io.reset_outfifo)(RegNext(0.U))
         }
         is(stream_users) {
-            w_Z := indexeduserstream    
-            w_index := withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegNext(index))
+            w_Z.data := indexeduserstream    
+            w_Z.index := withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegNext(index))
 
         }
         is(stream_rx) {
-            w_Z := indexedrxstream    
-            w_index := withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegNext(index))
+            w_Z.data := indexedrxstream    
+            w_Z.index := withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegNext(index))
         }
         is(stream_sum) {
-            w_Z := sumusersstream    
-            w_index := withClock(io.clock_symrate)(RegNext(0.U))
+            w_Z.data := sumusersstream    
+            w_Z.index := withClock(io.clock_symrate)(RegNext(0.U))
         }
     }
     
     //Here we reformat the output signals to a single bitvector
     when ( outfifo.enq.ready ){
-        outfifo.enq.bits.data:=w_Z
-        outfifo.enq.bits.index:=w_index
+        outfifo.enq.bits:=w_Z
     } .otherwise {
-        outfifo.enq.bits.data:=iozerovec
-        outfifo.enq.bits.index:=0.U
+        outfifo.enq.bits:=iofifozero
     }
-    io.ofifo.bits.data :=  outfifo.deq.bits.data
-    io.ofifo.bits.index := outfifo.deq.bits.index
+    io.ofifo.bits :=  outfifo.deq.bits
 
 }
 
