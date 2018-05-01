@@ -11,6 +11,7 @@ import freechips.rocketchip.util._
 import f2_decimator._
 import f2_rx_path._
 import prog_delay._
+import edge_detector._
 
 
 //Consider using "unit" instead of "User" 
@@ -41,7 +42,8 @@ class f2_rx_dsp_io(
         val antennas  : Int=4, 
         val users     : Int=4,
         val neighbours: Int=4,
-        val progdelay : Int=64
+        val progdelay : Int=64,
+        val finedelay : Int=32
     ) extends Bundle {
     val iptr_A             = Input(Vec(antennas,DspComplex(SInt(inputn.W), SInt(inputn.W))))
     val decimator_clocks   =  new f2_decimator_clocks    
@@ -65,7 +67,8 @@ class f2_rx_dsp_io(
     val adc_lut_write_en   = Input(Bool())
     val ofifo              = DecoupledIO(new iofifosigs(n=n))
     val iptr_fifo          = Vec(neighbours,Flipped(DecoupledIO(new iofifosigs(n=n,users=users))))
-    val rx_path_delays     = Input(Vec(antennas, Vec(users,UInt(log2Ceil(progdelay).W))))
+    val rx_user_delays     = Input(Vec(antennas, Vec(users,UInt(log2Ceil(progdelay).W))))
+    val rx_fine_delays     = Input(Vec(antennas,UInt(log2Ceil(finedelay).W)))
     val neighbour_delays   = Input(Vec(neighbours, Vec(users,UInt(log2Ceil(progdelay).W))))
 }
 
@@ -76,7 +79,8 @@ class f2_rx_dsp (
         users      : Int=4, 
         fifodepth  : Int=128, 
         neighbours : Int=4,
-        progdelay  : Int=64
+        progdelay  : Int=64,
+        finedelay  : Int=32
     ) extends Module {
     val io = IO( 
         new f2_rx_dsp_io(
@@ -85,7 +89,8 @@ class f2_rx_dsp (
             antennas=antennas,
             users=users,
             neighbours=neighbours,
-            progdelay=progdelay
+            progdelay=progdelay,
+            finedelay=finedelay
         )
     )
     //Zeros
@@ -104,20 +109,22 @@ class f2_rx_dsp (
                     inputn=inputn,
                     n=n, 
                     users=users, 
-                    progdelay=progdelay
+                    progdelay=progdelay,
+                    finedelay=finedelay
                 )
            ).io})
     
     (rx_path,io.decimator_controls).zipped.map(_.decimator_controls:=_)
     rx_path.map(_.decimator_clocks:=io.decimator_clocks) 
     (rx_path,io.iptr_A).zipped.map(_.iptr_A:=_)
-    rx_path.map(_.adc_fifo_lut_mode:=io.adc_fifo_lut_mode)
-    rx_path.map(_.adc_lut_write_addr:=io.adc_lut_write_addr)
-    rx_path.map(_.adc_lut_write_en:=io.adc_lut_write_en)
-    rx_path.map(_.reset_adcfifo:=io.reset_adcfifo)
+    rx_path.map(_.adc_ioctrl.adc_fifo_lut_mode:=io.adc_fifo_lut_mode)
+    rx_path.map(_.adc_ioctrl.adc_lut_write_addr:=io.adc_lut_write_addr)
+    rx_path.map(_.adc_ioctrl.adc_lut_write_en:=io.adc_lut_write_en)
+    rx_path.map(_.adc_ioctrl.reset_adcfifo:=io.reset_adcfifo)
     (rx_path,io.adc_clocks).zipped.map(_.adc_clock:=_)
-    (rx_path,io.adc_lut_write_vals).zipped.map(_.adc_lut_write_val:=_)
-    (rx_path,io.rx_path_delays).zipped.map(_.user_delays:=_)
+    (rx_path,io.adc_lut_write_vals).zipped.map(_.adc_ioctrl.adc_lut_write_val:=_)
+    (rx_path,io.rx_user_delays).zipped.map(_.adc_ioctrl.user_delays:=_)
+    (rx_path,io.rx_fine_delays).zipped.map(_.adc_ioctrl.fine_delays:=_)
 
     //Input fifo from serdes
     val infifo = Seq.fill(neighbours){Module(new AsyncQueue(new iofifosigs(n=n),depth=fifodepth)).io}
@@ -142,17 +149,14 @@ class f2_rx_dsp (
     infifo.map(_.enq_reset:=io.reset_infifo)
     (infifo,io.iptr_fifo).zipped.map(_.enq<>_)
     (infifo,io.clock_infifo_enq).zipped.map(_.enq_clock:=_)
-    infifo.map(_.deq_clock :=io.clock_symrate)
+    infifo.map(_.deq_clock :=clock)  //Fastest possible clock. Rate controlled by ready
 
     when (io.input_mode===0.U) {
         inputmode := zero
-        infifo.map(_.deq.ready:=false.B)
     } .elsewhen (io.input_mode===1.U ) {
         inputmode := userssum
-        infifo.map(_.deq.ready:=true.B)
     } .otherwise {
         inputmode:=zero
-        infifo.map(_.deq.ready:=false.B)
     }
 
     for (i <- 0 to neighbours-1) {
@@ -302,52 +306,70 @@ class f2_rx_dsp (
 
     //Clock multiplexing does not work. Use valid to control output rate.
     //TODO: change this to edge detector using clocks
-    val validcount  = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegInit(uindexzero))
-    val validreg =  withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegInit(false.B))
-
+    //val validcount  = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegInit(uindexzero))
+    //val validreg=  withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegInit(false.B))
+    val edges_symratex4      =  Module( new edge_detector()).io 
+    val edges_symrate =  Module( new edge_detector()).io 
+    edges_symratex4.A :=io.clock_symratex4.asUInt
+    edges_symrate.A :=io.clock_symrate.asUInt
 
     //control the valid signal for the interface
-    when ( (mode===bypass) ||  (mode===select_users) ||  (mode===select_antennas) 
-        || (mode===select_both) || (mode===stream_sum)  ) {
-        // In these modes, the write rate is symrate
-        when (validcount===3.U) {
-            validcount:=0.U
-            validreg := true.B
-        } .otherwise {
-            validcount:= validcount+1.U(1.W)
-            validreg := false.B
-        }
-    } .elsewhen ( ( mode===stream_users) || (mode===stream_rx) ) {
-        // In these modes, the write rate is 4xsymrate
-        validreg :=true.B
-    } .otherwise {
-        //Unknown modes
-        validcount := 0.U
-        validreg := false.B
-    }
-    outfifo.enq.valid :=  validreg   
+    //when ( (mode===bypass) ||  (mode===select_users) ||  (mode===select_antennas) 
+    //    || (mode===select_both) || (mode===stream_sum)  ) {
+    //    // In these modes, the write rate is symrate
+    //    when (validcount===3.U) {
+    //        validcount:=0.U
+    //        validreg := true.B
+    //    } .otherwise {
+    //        validcount:= validcount+1.U(1.W)
+    //        validreg := false.B
+    //    }
+    //} .elsewhen ( ( mode===stream_users) || (mode===stream_rx) ) {
+    //    // In these modes, the write rate is 4xsymrate
+    //    validreg :=true.B
+    //} .otherwise {
+    //    //Unknown modes
+    //    validcount := 0.U
+    //    validreg := false.B
+    //}
+    //outfifo.enq.valid :=  validreg   
 
 
     //Mode operation definitions
     when( mode===bypass ) {
         (w_Z.data,rx_path).zipped.map(_.udata:=_.Z(0))
          w_Z.rxindex := rxindexzero
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===select_users ) {
-           w_Z:=seluser
+         w_Z:=RegNext(seluser)
+         outfifo.enq.valid :=  edges_symrate.rising   
+         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
     }.elsewhen ( mode===select_antennas ) {
-           w_Z:=selrx
+         w_Z:=RegNext(selrx)
+         outfifo.enq.valid :=  edges_symrate.rising   
+         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
     }.elsewhen ( mode===select_both ) {
-           w_Z:=selrxuser
+         w_Z:=RegNext(selrxuser)
+         outfifo.enq.valid :=  edges_symrate.rising   
+         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
     }.elsewhen  (mode===stream_users ) {
-           w_Z := indexeduserstream    
+         w_Z := RegNext(indexeduserstream)    
+         outfifo.enq.valid :=  edges_symratex4.rising   
+         infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
     }.elsewhen ( mode===stream_rx ) {
-           w_Z := indexedrxstream    
+         w_Z := RegNext(indexedrxstream)    
+         outfifo.enq.valid :=  edges_symratex4.rising   
+         infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
     }.elsewhen ( mode===stream_sum ) {
-           w_Z:= sumusersstream    
+         w_Z:= RegNext(sumusersstream)    
+         outfifo.enq.valid :=  edges_symrate.rising   
+         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
     }.otherwise {
-            w_Z  := sumusersstream
+          w_Z  := RegNext(sumusersstream)
+         outfifo.enq.valid :=  edges_symrate.rising   
+         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
     }
-    
     
     //Here we reformat the output signals to a single bitvector
     when ( outfifo.enq.ready ){
