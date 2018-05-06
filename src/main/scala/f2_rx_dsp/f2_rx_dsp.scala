@@ -43,7 +43,8 @@ class f2_rx_dsp_io(
         val users     : Int=4,
         val neighbours: Int=4,
         val progdelay : Int=64,
-        val finedelay : Int=32
+        val finedelay : Int=32,
+        val weightbits: Int=10
     ) extends Bundle {
     val iptr_A             = Input(Vec(antennas,DspComplex(SInt(inputn.W), SInt(inputn.W))))
     val decimator_clocks   =  new f2_decimator_clocks    
@@ -69,6 +70,7 @@ class f2_rx_dsp_io(
     val iptr_fifo          = Vec(neighbours,Flipped(DecoupledIO(new iofifosigs(n=n,users=users))))
     val rx_user_delays     = Input(Vec(antennas, Vec(users,UInt(log2Ceil(progdelay).W))))
     val rx_fine_delays     = Input(Vec(antennas,UInt(log2Ceil(finedelay).W)))
+    val rx_user_weights    = Input(Vec(antennas,Vec(users,DspComplex(SInt(weightbits.W),SInt(weightbits.W)))))
     val neighbour_delays   = Input(Vec(neighbours, Vec(users,UInt(log2Ceil(progdelay).W))))
 }
 
@@ -80,7 +82,8 @@ class f2_rx_dsp (
         fifodepth  : Int=128, 
         neighbours : Int=4,
         progdelay  : Int=64,
-        finedelay  : Int=32
+        finedelay  : Int=32,
+        weightbits : Int=10
     ) extends Module {
     val io = IO( 
         new f2_rx_dsp_io(
@@ -125,6 +128,7 @@ class f2_rx_dsp (
     (rx_path,io.adc_lut_write_vals).zipped.map(_.adc_ioctrl.adc_lut_write_val:=_)
     (rx_path,io.rx_user_delays).zipped.map(_.adc_ioctrl.user_delays:=_)
     (rx_path,io.rx_fine_delays).zipped.map(_.adc_ioctrl.fine_delays:=_)
+    (rx_path,io.rx_user_weights).zipped.map(_.adc_ioctrl.user_weights:=_)
 
     //Input fifo from serdes
     val infifo = Seq.fill(neighbours){Module(new AsyncQueue(new iofifosigs(n=n),depth=fifodepth)).io}
