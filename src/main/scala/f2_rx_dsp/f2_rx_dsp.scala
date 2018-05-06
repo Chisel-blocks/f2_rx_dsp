@@ -24,6 +24,7 @@ class iofifosigs(val n: Int, val users: Int=4 ) extends Bundle {
         //4=Users
         val data=Vec(users,new usersigs(n=n,users=users))
         val rxindex=UInt(2.W)
+        override def cloneType = (new iofifosigs(n,users)).asInstanceOf[this.type]
 }
 
 //constants
