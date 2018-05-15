@@ -115,14 +115,14 @@ object tb_f2_rx_dsp {
                           ("in","adc_lut_write_vals_2_imag",adc_lut_width-1,0,"None","None"),
                           ("in","adc_lut_write_vals_3_imag",adc_lut_width-1,0,"None","None"),
                           ("in","adc_lut_write_en",0,0,"None",0),
-                          ("outs","ofifo_bits_data_0_real",n-1,0,"None","None"),
-                          ("outs","ofifo_bits_data_0_imag",n-1,0,"None","None"),
-                          ("outs","ofifo_bits_data_1_real",n-1,0,"None","None"),
-                          ("outs","ofifo_bits_data_1_imag",n-1,0,"None","None"),
-                          ("outs","ofifo_bits_data_2_real",n-1,0,"None","None"),
-                          ("outs","ofifo_bits_data_2_imag",n-1,0,"None","None"),
-                          ("outs","ofifo_bits_data_3_real",n-1,0,"None","None"),
-                          ("outs","ofifo_bits_data_3_imag",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_0_udata_real",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_0_udata_imag",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_1_udata_real",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_1_udata_imag",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_2_udata_real",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_2_udata_imag",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_3_udata_real",n-1,0,"None","None"),
+                          ("outs","ofifo_bits_data_3_udata_imag",n-1,0,"None","None"),
                           ("out","ofifo_bits_index",1,0,"None","None"),
                           ("in","ofifo_ready","None","None","None",1),
                           ("out","ofifo_valid","None","None","None","None"),
@@ -222,10 +222,10 @@ object tb_f2_rx_dsp {
                         |    //Print only valid values 
                         |    if (~$isunknown(io_ofifo_bits_data_0_real) ) begin
                         |        $fwrite(outfile, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", 
-                        |                         io_ofifo_bits_data_0_real, io_ofifo_bits_data_0_imag, 
-                        |                         io_ofifo_bits_data_1_real, io_ofifo_bits_data_1_imag, 
-                        |                         io_ofifo_bits_data_2_real, io_ofifo_bits_data_2_imag, 
-                        |                         io_ofifo_bits_data_3_real, io_ofifo_bits_data_3_imag);
+                        |                         io_ofifo_bits_data_0_udata_real, io_ofifo_bits_data_0_udata_imag, 
+                        |                         io_ofifo_bits_data_1_udata_real, io_ofifo_bits_data_1_udata_imag, 
+                        |                         io_ofifo_bits_data_2_udata_real, io_ofifo_bits_data_2_udata_imag, 
+                        |                         io_ofifo_bits_data_3_udata_real, io_ofifo_bits_data_3_udata_imag);
                         |    end
                         |    else begin
                         |         $display( $time, "Dropping invalid output values at ");
