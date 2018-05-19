@@ -38,6 +38,7 @@ object tb_f2_rx_dsp {
                            ("g_outfile","\"./Z.txt\""),
                            ("g_Rs_high","16*8*20.0e6"),
                            ("g_Rs_low","20.0e6"),
+                           ("g_shift","0"),
                            ("g_scale0","1"),
                            ("g_scale1","1"),
                            ("g_scale2","1"),
@@ -57,6 +58,7 @@ object tb_f2_rx_dsp {
                           ("wire","clkp8n","None","None","None","None"),
                           ("reg","Ndiv",7,0,"None","c_ratio0"),
                           ("reg","reset_clk","None","None","None",1),
+                          ("reg","shift","None","None","None","g_shift"),
                           ("clock","clock","None","None","None","None"),
                           ("reset","reset","None","None","None",1),
                           ("in","iptr_A_0_real",inputn-1,0,"None","None"),
@@ -382,6 +384,7 @@ object tb_f2_rx_dsp {
                         |  .clock(clock), // @[:@4.4]
                         |  .reset(reset), // @[:@5.4]
                         |  .io_Ndiv(io_Ndiv), // @[:@6.4]
+                        |  .io_shift(io_shift), // @[:@6.4]
                         |  .io_reset_clk(io_reset_clk), // @[:@6.4]
                         |  .io_clkpn (io_clkpn), // @[:@6.4]
                         |  .io_clkp2n(io_clkp2n), // @[:@6.4]
