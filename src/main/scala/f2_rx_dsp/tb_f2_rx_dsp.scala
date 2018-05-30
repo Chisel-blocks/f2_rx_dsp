@@ -58,7 +58,7 @@ object tb_f2_rx_dsp {
                           ("wire","clkp8n","None","None","None","None"),
                           ("reg","Ndiv",7,0,"None","c_ratio0"),
                           ("reg","reset_clk","None","None","None",1),
-                          ("reg","shift","None","None","None","g_shift"),
+                          ("reg","shift","1","0","None","g_shift"),
                           ("clock","clock","None","None","None","None"),
                           ("reset","reset","None","None","None",1),
                           ("in","iptr_A_0_real",inputn-1,0,"None","None"),
