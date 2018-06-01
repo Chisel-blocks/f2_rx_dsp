@@ -22,6 +22,7 @@ object tb_f2_rx_dsp {
              val oname=name
              val dutmod = "f2_rx_dsp" 
              val n = 16
+             val antennas = 4
              val inputn = 9
              val gainbits= 10
              val decimator_modebits= 3
@@ -48,6 +49,7 @@ object tb_f2_rx_dsp {
                            ("g_rx_output_mode","0"),
                            ("g_input_mode","0"),
                            ("g_mode","4"),
+                           ("g_inv_adc_clk_pol","1"),
                            ("g_adc_fifo_lut_mode","2"))
 
             //(type,name,upperlimit,lowerlimit, assign,init)    
@@ -113,6 +115,10 @@ object tb_f2_rx_dsp {
                           ("in","rx_output_mode",rx_output_modebits-1,0,"None","None"),
                           ("in","input_mode",input_modebits-1,0,"None","None"),
                           ("in","adc_fifo_lut_mode",adc_fifo_lut_modebits-1,0,"None","g_adc_fifo_lut_mode"),
+                          ("in","inv_adc_clk_pol_0","None","None","None","g_inv_adc_clk_pol"),
+                          ("in","inv_adc_clk_pol_1","None","None","None","g_inv_adc_clk_pol"),
+                          ("in","inv_adc_clk_pol_2","None","None","None","g_inv_adc_clk_pol"),
+                          ("in","inv_adc_clk_pol_3","None","None","None","g_inv_adc_clk_pol"),
                           ("in","adc_lut_write_addr",adc_lut_width-1,0,"None","None"),
                           ("in","adc_lut_write_vals_0_real",adc_lut_width-1,0,"None","None"),
                           ("in","adc_lut_write_vals_1_real",adc_lut_width-1,0,"None","None"),
