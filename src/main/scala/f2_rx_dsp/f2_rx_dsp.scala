@@ -1,6 +1,54 @@
-// See LICENSE for license details.
+// Initially written by Marko Kosunen, marko.kosunen@aalto.fi 
+// May  2018
+// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 09.08.2018 16:48
 //
-//Start with a static tb and try to genererate a gnerator for it
+// Input control parameters signals:
+// The capacity of the output is users*datarate, so if we want to monitor all data 
+// of all users from all  rx_paths independently, the rate has to be increased to
+// antennas*users*datarate by serializing.
+//
+// input_mode:
+//     0 : zero     : User data from the noughbouring modules is zeroed
+//     1 : userssum : User data from neighbouring modules is summed to received user stream 
+//                    of this module in rx_output_mode=4
+//
+// rx_ouput_mode: 
+//     0 : Bypass        : User 0 from all rx paths is routed to output.
+//     1 : Select user   : All received streams for user_index are selected 
+//                         to output data stream
+//     2 : Select antenna: All Users from  antenna_index are selected to ouput
+//                         data stream   
+//     3 : Select both   : User_index from antenna_index is selected to output 
+//                         data stream position 0 
+//     4 : Stream users  : In output data, Rx paths are in parallel, and users 
+//                         are streamed out serial manner with higher data rate.  
+//     5 : Stream rx     : In output data, Users are in parallel and Rx paths 
+//                         are outputted in serial manner with higher data rate.
+//     6 : Stream sum    : Output data stream is the sum of user data is. 
+//                         Input_mode controls if the data from Neighbouring modules is included.
+//
+// user_index:
+//     [0-users-1]       : Select the user of given index
+//
+// antenna_index:
+//     [0-users-1]       : Select the antenna of given index
+//
+// adc_fifo_lut_mode     :
+//
+// inv_adc_clock_pol     :
+//
+// rx_user_delays        :
+//
+// rx_fine_delays        :
+//
+// rx_user_weights       :
+//
+/////////////////////////////////////////////////////////////////////////////
+//
+// TODO: Simplify clocking
+//
+//////////////////////////////////////////////////////////////////////////////////
+
 package f2_rx_dsp
 import chisel3._
 import chisel3.util._
@@ -27,7 +75,7 @@ class iofifosigs(val n: Int, val users: Int=4 ) extends Bundle {
         override def cloneType = (new iofifosigs(n,users)).asInstanceOf[this.type]
 }
 
-//constants
+//Constants
 class usersigzeros(val n: Int, val users: Int=4) extends Bundle { 
     val userzero   = 0.U.asTypeOf(new usersigs(n=n,users=users))
     val udatazero  = 0.U.asTypeOf(userzero.data)
@@ -106,6 +154,7 @@ class f2_rx_dsp (
     val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n))
     val datazero   = 0.U.asTypeOf(iofifozero.data)
     val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
+
     //-The RX:s
     // Vec is required to do runtime adressing of an array i.e. Seq is not hardware structure
     val rx_path  = VecInit(Seq.fill(antennas){ 
@@ -180,7 +229,6 @@ class f2_rx_dsp (
     val w_Z = Wire( new iofifosigs(n=n))
 
     // First we generate all possible output signals, then we just select The one we want.
-    
     //Generate the sum of users
     val sumusersstream = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
         RegInit(iofifozero)
@@ -311,36 +359,12 @@ class f2_rx_dsp (
      w_Z.data.map(_.uindex:=uindexzero)
      w_Z.rxindex:=rxindexzero
 
-    //Clock multiplexing does not work. Use valid to control output rate.
-    //TODO: change this to edge detector using clocks
-    //val validcount  = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegInit(uindexzero))
-    //val validreg=  withClockAndReset(io.clock_symratex4,io.reset_outfifo)(RegInit(false.B))
+    // Clock multiplexing tricky to implement. 
+    // Use valid to control output rate.
     val edges_symratex4      =  Module( new edge_detector()).io 
     val edges_symrate =  Module( new edge_detector()).io 
     edges_symratex4.A :=io.clock_symratex4.asUInt
     edges_symrate.A :=io.clock_symrate.asUInt
-
-    //control the valid signal for the interface
-    //when ( (mode===bypass) ||  (mode===select_users) ||  (mode===select_antennas) 
-    //    || (mode===select_both) || (mode===stream_sum)  ) {
-    //    // In these modes, the write rate is symrate
-    //    when (validcount===3.U) {
-    //        validcount:=0.U
-    //        validreg := true.B
-    //    } .otherwise {
-    //        validcount:= validcount+1.U(1.W)
-    //        validreg := false.B
-    //    }
-    //} .elsewhen ( ( mode===stream_users) || (mode===stream_rx) ) {
-    //    // In these modes, the write rate is 4xsymrate
-    //    validreg :=true.B
-    //} .otherwise {
-    //    //Unknown modes
-    //    validcount := 0.U
-    //    validreg := false.B
-    //}
-    //outfifo.enq.valid :=  validreg   
-
 
     //Mode operation definitions
     when( mode===bypass ) {
@@ -378,7 +402,7 @@ class f2_rx_dsp (
          infifo.map(_.deq.ready  :=  edges_symrate.rising)   
     }
     
-    //Here we reformat the output signals to a single bitvector
+    //Here we reformat the output
     when ( outfifo.enq.ready ){
         outfifo.enq.bits:=w_Z
     } .otherwise {
