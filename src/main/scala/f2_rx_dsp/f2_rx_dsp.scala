@@ -1,6 +1,6 @@
 // Initially written by Marko Kosunen, marko.kosunen@aalto.fi 
 // May  2018
-// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 09.08.2018 16:48
+// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 30.08.2018 10:55
 //
 // Input control parameters signals:
 // The capacity of the output is users*datarate, so if we want to monitor all data 
@@ -8,7 +8,7 @@
 // antennas*users*datarate by serializing.
 //
 // input_mode:
-//     0 : zero     : User data from the noughbouring modules is zeroed
+//     0 : zero     : User data from the neighbouring modules is zeroed
 //     1 : userssum : User data from neighbouring modules is summed to received user stream 
 //                    of this module in rx_output_mode=4
 //
@@ -43,6 +43,10 @@
 //
 // rx_user_weights       :
 //
+// Clocking: 
+//                       clock is the highest clock rate
+//                       clock_symrate is the lowest clock rate, BB symbol rate
+//               
 /////////////////////////////////////////////////////////////////////////////
 //
 // TODO: Simplify clocking
@@ -116,6 +120,7 @@ class f2_rx_dsp_io(
     val adc_lut_write_addr = Input(UInt(inputn.W))
     val adc_lut_write_vals = Input(Vec(antennas,DspComplex(SInt(inputn.W), SInt(inputn.W))))
     val adc_lut_write_en   = Input(Bool())
+    val adc_lut_reset      = Input(Bool())
     val ofifo              = DecoupledIO(new iofifosigs(n=n))
     val iptr_fifo          = Vec(neighbours,Flipped(DecoupledIO(new iofifosigs(n=n,users=users))))
     val rx_user_delays     = Input(Vec(antennas, Vec(users,UInt(log2Ceil(progdelay).W))))
@@ -175,6 +180,7 @@ class f2_rx_dsp (
     rx_path.map(_.adc_ioctrl.adc_fifo_lut_mode:=io.adc_fifo_lut_mode)
     rx_path.map(_.adc_ioctrl.adc_lut_write_addr:=io.adc_lut_write_addr)
     rx_path.map(_.adc_ioctrl.adc_lut_write_en:=io.adc_lut_write_en)
+    rx_path.map(_.adc_ioctrl.adc_lut_reset:=io.adc_lut_reset)
     rx_path.map(_.adc_ioctrl.reset_adcfifo:=io.reset_adcfifo)
     (rx_path,io.adc_clocks).zipped.map(_.adc_clock:=_)
     (rx_path,io.adc_lut_write_vals).zipped.map(_.adc_ioctrl.adc_lut_write_val:=_)
@@ -361,9 +367,9 @@ class f2_rx_dsp (
 
     // Clock multiplexing tricky to implement. 
     // Use valid to control output rate.
-    val edges_symratex4      =  Module( new edge_detector()).io 
-    val edges_symrate =  Module( new edge_detector()).io 
+    val edges_symratex4 =  withClock(io.clock_outfifo_deq){Module( new edge_detector()).io} 
     edges_symratex4.A :=io.clock_symratex4.asUInt
+    val edges_symrate =  withClock(io.clock_outfifo_deq){Module( new edge_detector()).io} 
     edges_symrate.A :=io.clock_symrate.asUInt
 
     //Mode operation definitions
@@ -386,12 +392,16 @@ class f2_rx_dsp (
          infifo.map(_.deq.ready  :=  edges_symrate.rising)   
     }.elsewhen  (mode===stream_users ) {
          w_Z := RegNext(indexeduserstream)    
-         outfifo.enq.valid :=  edges_symratex4.rising   
-         infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
+         //outfifo.enq.valid :=  edges_symratex4.rising   
+         outfifo.enq.valid :=  true.B
+         //infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
+         infifo.map(_.deq.ready  :=  true.B) 
     }.elsewhen ( mode===stream_rx ) {
          w_Z := RegNext(indexedrxstream)    
-         outfifo.enq.valid :=  edges_symratex4.rising   
-         infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
+         //outfifo.enq.valid :=  edges_symratex4.rising   
+         outfifo.enq.valid :=  true.B
+         //infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
+         infifo.map(_.deq.ready  :=  true.B) 
     }.elsewhen ( mode===stream_sum ) {
          w_Z:= RegNext(sumusersstream)    
          outfifo.enq.valid :=  edges_symrate.rising   
