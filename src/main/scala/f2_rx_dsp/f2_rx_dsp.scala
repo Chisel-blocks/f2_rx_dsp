@@ -1,6 +1,6 @@
 // Initially written by Marko Kosunen, marko.kosunen@aalto.fi 
 // May  2018
-// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 30.08.2018 10:55
+// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 03.09.2018 18:42
 //
 // Input control parameters signals:
 // The capacity of the output is users*datarate, so if we want to monitor all data 
@@ -92,6 +92,7 @@ class usersigzeros(val n: Int, val users: Int=4) extends Bundle {
 class f2_rx_dsp_io(
         val inputn    : Int=9, 
         val n         : Int=16, 
+        val resolution: Int=32, 
         val antennas  : Int=4, 
         val users     : Int=4,
         val neighbours: Int=4,
@@ -101,7 +102,7 @@ class f2_rx_dsp_io(
     ) extends Bundle {
     val iptr_A             = Input(Vec(antennas,DspComplex(SInt(inputn.W), SInt(inputn.W))))
     val decimator_clocks   =  new f2_decimator_clocks    
-    val decimator_controls = Vec(antennas,new f2_decimator_controls(gainbits=10))    
+    val decimator_controls = Vec(antennas,new f2_decimator_controls(resolution=resolution,gainbits=10))    
     val adc_clocks         = Input(Vec(antennas,Clock()))
     val clock_symrate      = Input(Clock())
     val clock_symratex4    = Input(Clock())
@@ -132,6 +133,7 @@ class f2_rx_dsp_io(
 class f2_rx_dsp (
         inputn     : Int=9,
         n          : Int=16, 
+        resolution : Int=32, 
         antennas   : Int=4, 
         users      : Int=4, 
         fifodepth  : Int=128, 
@@ -144,6 +146,7 @@ class f2_rx_dsp (
         new f2_rx_dsp_io(
             inputn=inputn,
             n=n,
+            resolution=resolution,
             antennas=antennas,
             users=users,
             neighbours=neighbours,
@@ -167,6 +170,7 @@ class f2_rx_dsp (
                 new  f2_rx_path (
                     inputn=inputn,
                     n=n, 
+                    resolution=resolution,
                     users=users, 
                     progdelay=progdelay,
                     finedelay=finedelay
@@ -424,6 +428,6 @@ class f2_rx_dsp (
 
 //This gives you verilog
 object f2_rx_dsp extends App {
-  chisel3.Driver.execute(args, () => new f2_rx_dsp(inputn=9, n=16, antennas=4, users=4, fifodepth=128 ))
+  chisel3.Driver.execute(args, () => new f2_rx_dsp(inputn=9, resolution=32,n=16, antennas=4, users=4, fifodepth=128 ))
 }
 

@@ -19,21 +19,22 @@ object tb_f2_rx_dsp {
          val name= this.getClass.getSimpleName.split("\\$").last
          val tb = new BufferedWriter(new FileWriter("./verilog/"+name+".v"))
          object tbvars {
-             val oname=name
-             val dutmod = "f2_rx_dsp" 
-             val n = 16
-             val antennas = 4
-             val inputn = 9
-             val gainbits= 10
-             val decimator_modebits= 3
-             val rx_output_modebits= 3
-             val input_modebits= 3
+             val oname                = name
+             val dutmod               = "f2_rx_dsp" 
+             val n                    = 16
+             val antennas             = 4
+             val inputn               = 9
+             val gainbits             = 10
+             val decimator_modebits   = 3
+             val rx_output_modebits   = 3
+             val input_modebits       = 3
              val adc_fifo_lut_modebits= 3
-             val adc_lut_width= 9
-             val indexbits= 2
-             val delay_width      = 6
-             val fine_delay_width = 5
-             val weight_width     = 10
+             val adc_lut_width        = 9
+             val indexbits            = 2
+             val delay_width          = 6
+             val fine_delay_width     = 5
+             val integshiftbits       = 5 
+             val weight_width         = 10
 
              val paramseq=Seq(("g_infile","\"./A.txt\""), 
                            ("g_outfile","\"./Z.txt\""),
@@ -44,6 +45,7 @@ object tb_f2_rx_dsp {
                            ("g_scale1","1"),
                            ("g_scale2","1"),
                            ("g_scale3","1"),
+                           ("g_cic3shift","4"),
                            ("g_user_index","0"),
                            ("g_antenna_index","0"),
                            ("g_rx_output_mode","0"),
@@ -60,37 +62,46 @@ object tb_f2_rx_dsp {
                           ("wire","clkp8n","None","None","None","None"),
                           ("reg","Ndiv",7,0,"None","c_ratio0"),
                           ("reg","reset_clk","None","None","None",1),
+                          ("reg","reset_loop","None","None","None",1),
                           ("reg","shift","1","0","None","g_shift"),
                           ("clock","clock","None","None","None","None"),
                           ("reset","reset","None","None","None",1),
-                          ("in","iptr_A_0_real",inputn-1,0,"None","None"),
-                          ("in","iptr_A_0_imag",inputn-1,0,"None","None"),
-                          ("in","iptr_A_1_real",inputn-1,0,"None","None"),
-                          ("in","iptr_A_1_imag",inputn-1,0,"None","None"),
-                          ("in","iptr_A_2_real",inputn-1,0,"None","None"),
-                          ("in","iptr_A_2_imag",inputn-1,0,"None","None"),
-                          ("in","iptr_A_3_real",inputn-1,0,"None","None"),
-                          ("in","iptr_A_3_imag",inputn-1,0,"None","None"),
+                          ("in","iptr_A_0_real",inputn-1,0,"None",0),
+                          ("in","iptr_A_0_imag",inputn-1,0,"None",0),
+                          ("in","iptr_A_1_real",inputn-1,0,"None",0),
+                          ("in","iptr_A_1_imag",inputn-1,0,"None",0),
+                          ("in","iptr_A_2_real",inputn-1,0,"None",0),
+                          ("in","iptr_A_2_imag",inputn-1,0,"None",0),
+                          ("in","iptr_A_3_real",inputn-1,0,"None",0),
+                          ("in","iptr_A_3_imag",inputn-1,0,"None",0),
                           ("dclk","decimator_clocks_cic3clockslow","None","None","clkpn","None"),
                           ("dclk","decimator_clocks_hb1clock_low","None","None","clkp2n","None"),
                           ("dclk","decimator_clocks_hb2clock_low","None","None","clkp4n","None"),
                           ("dclk","decimator_clocks_hb3clock_low","None","None","clkp8n","None"),
                           ("in","decimator_controls_0_cic3integscale",gainbits-1,0,"None","g_scale0"),
+                          ("in","decimator_controls_0_cic3integshift",integshiftbits-1,0,"None","g_cic3shift"),
+                          ("in","decimator_controls_0_reset_loop",0,0,"reset_loop","None"),
                           ("in","decimator_controls_0_hb1scale",gainbits-1,0,"None","g_scale1"),
                           ("in","decimator_controls_0_hb2scale",gainbits-1,0,"None","g_scale2"),
                           ("in","decimator_controls_0_hb3scale",gainbits-1,0,"None","g_scale3"),
                           ("in","decimator_controls_0_mode",decimator_modebits-1,0,"None","g_mode"),
                           ("in","decimator_controls_1_cic3integscale",gainbits-1,0,"None","g_scale0"),
+                          ("in","decimator_controls_1_cic3integshift",integshiftbits-1,0,"None","g_cic3shift"),
+                          ("in","decimator_controls_1_reset_loop",0,0,"reset_loop","None"),
                           ("in","decimator_controls_1_hb1scale",gainbits-1,0,"None","g_scale1"),
                           ("in","decimator_controls_1_hb2scale",gainbits-1,0,"None","g_scale2"),
                           ("in","decimator_controls_1_hb3scale",gainbits-1,0,"None","g_scale3"),
                           ("in","decimator_controls_1_mode",decimator_modebits-1,0,"None","g_mode"),
-                          ("in","decimator_controls_2_cic3integscale",gainbits-1,0,"None","g_scale1"),
+                          ("in","decimator_controls_2_cic3integscale",gainbits-1,0,"None","g_scale0"),
+                          ("in","decimator_controls_2_cic3integshift",integshiftbits-1,0,"None","g_cic3shift"),
+                          ("in","decimator_controls_2_reset_loop",0,0,"reset_loop","None"),
                           ("in","decimator_controls_2_hb1scale",gainbits-1,0,"None","g_scale1"),
                           ("in","decimator_controls_2_hb2scale",gainbits-1,0,"None","g_scale2"),
                           ("in","decimator_controls_2_hb3scale",gainbits-1,0,"None","g_scale3"),
                           ("in","decimator_controls_2_mode",decimator_modebits-1,0,"None","g_mode"),
                           ("in","decimator_controls_3_cic3integscale",gainbits-1,0,"None","g_scale0"),
+                          ("in","decimator_controls_3_cic3integshift",integshiftbits-1,0,"None","g_cic3shift"),
+                          ("in","decimator_controls_3_reset_loop",0,0,"reset_loop","None"),
                           ("in","decimator_controls_3_hb1scale",gainbits-1,0,"None","g_scale1"),
                           ("in","decimator_controls_3_hb2scale",gainbits-1,0,"None","g_scale2"),
                           ("in","decimator_controls_3_hb3scale",gainbits-1,0,"None","g_scale3"),
@@ -129,6 +140,7 @@ object tb_f2_rx_dsp {
                           ("in","adc_lut_write_vals_2_imag",adc_lut_width-1,0,"None",0),
                           ("in","adc_lut_write_vals_3_imag",adc_lut_width-1,0,"None",0),
                           ("in","adc_lut_write_en",0,0,"None",0),
+                          ("in","adc_lut_reset","None","None","None",1),
 
                           // ofifo signals
                           ("outs","ofifo_bits_data_0_udata_real",n-1,0,"None","None"),
@@ -368,17 +380,18 @@ object tb_f2_rx_dsp {
                         |initial outfile = $fopen(g_outfile,"w"); // For writing
                         |
                         |//Clock definitions
-                        |always #(c_Ts)clock = !clock ;
+                        |always #(c_Ts/2.0)clock = !clock ;
                         | 
                         |//Read this with Ouput fifo enquque clk
-                        |always @(posedge io_clock_symrate && (initdone==1)) begin 
+                        |always @(posedge io_clock_symrate ) begin 
                         |    //Print only valid values 
-                        |    if (~$isunknown(io_ofifo_bits_data_0_udata_real) ) begin
+                        |    if (~$isunknown(io_ofifo_bits_data_0_udata_real) && (initdone==1) ) begin
                         |        $fwrite(outfile, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", 
                         |                         io_ofifo_bits_data_0_udata_real, io_ofifo_bits_data_0_udata_imag, 
                         |                         io_ofifo_bits_data_1_udata_real, io_ofifo_bits_data_1_udata_imag, 
                         |                         io_ofifo_bits_data_2_udata_real, io_ofifo_bits_data_2_udata_imag, 
-                        |                         io_ofifo_bits_data_3_udata_real, io_ofifo_bits_data_3_udata_imag);
+                        |                         io_ofifo_bits_data_3_udata_real, io_ofifo_bits_data_3_udata_imag
+                        |    );
                         |    end
                         |    else begin
                         |         $display( $time, "Dropping invalid output values at ");
@@ -401,6 +414,7 @@ object tb_f2_rx_dsp {
                         |""".stripMargin('|')+dutdef+initialdef+
                         """
                         |    #RESET_TIME
+                        |    initdone=0;
                         |    reset=0;
                         |    io_reset_clk=0;
                         |    #(16*RESET_TIME)
@@ -408,12 +422,11 @@ object tb_f2_rx_dsp {
                         |    io_reset_adcfifo=0;
                         |    io_reset_index_count=0;
                         |    io_reset_outfifo=0;
-                        |    io_reset_adcfifo=0;
                         |    io_reset_infifo=0;
+                        |    io_adc_lut_reset=0;
                         |//Tnit the LUT
-                        |    
                         |    while (memaddrcount<2**9) begin
-                        |       @(posedge clock) 
+                        |       @(posedge io_clock_symrate) 
                         |       io_adc_lut_write_en<=1;
                         |       io_adc_lut_write_addr<=memaddrcount;
                         |       io_adc_lut_write_vals_0_real<=memaddrcount; 
@@ -424,10 +437,12 @@ object tb_f2_rx_dsp {
                         |       io_adc_lut_write_vals_1_imag<=memaddrcount;
                         |       io_adc_lut_write_vals_2_imag<=memaddrcount;
                         |       io_adc_lut_write_vals_3_imag<=memaddrcount;
-                        |       @(posedge clock) 
+                        |       @(posedge io_clock_symrate) 
                         |       memaddrcount=memaddrcount+1;
                         |       io_adc_lut_write_en<=0;
                         |    end
+                        |    #(20*RESET_TIME)
+                        |    io_reset_loop<=0;
                         |    initdone=1;
                         |    infile = $fopen(g_infile,"r"); // For reading
                         |    while (!$feof(infile)) begin
