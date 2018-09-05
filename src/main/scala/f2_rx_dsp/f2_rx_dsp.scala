@@ -1,6 +1,6 @@
 // Initially written by Marko Kosunen, marko.kosunen@aalto.fi 
 // May  2018
-// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 03.09.2018 18:42
+// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 04.09.2018 22:38
 //
 // Input control parameters signals:
 // The capacity of the output is users*datarate, so if we want to monitor all data 
@@ -371,9 +371,9 @@ class f2_rx_dsp (
 
     // Clock multiplexing tricky to implement. 
     // Use valid to control output rate.
-    val edges_symratex4 =  withClock(io.clock_outfifo_deq){Module( new edge_detector()).io} 
-    edges_symratex4.A :=io.clock_symratex4.asUInt
-    val edges_symrate =  withClock(io.clock_outfifo_deq){Module( new edge_detector()).io} 
+    //val edges_symratex4 =  withClock(io.clock_symratex4){Module( new edge_detector()).io} 
+    //edges_symratex4.A :=io.clock_symratex4.asUInt
+    val edges_symrate =  withClock(io.clock_symratex4){Module( new edge_detector()).io} 
     edges_symrate.A :=io.clock_symrate.asUInt
 
     //Mode operation definitions

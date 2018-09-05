@@ -112,7 +112,7 @@ object tb_f2_rx_dsp {
                           ("dclk","adc_clocks_3","None","None","clock","None"),
                           ("dclk","clock_symrate","None","None","clkp8n","None"),
                           ("dclk","clock_symratex4","None","None","clkp2n","None"),
-                          ("dclk","clock_outfifo_deq","None","None","clock_symrate","None"),
+                          ("dclk","clock_outfifo_deq","None","None","clock","None"),
                           ("dclk","clock_infifo_enq_0","None","None","clock_symrate","None"),
                           ("dclk","clock_infifo_enq_1","None","None","clock_symrate","None"),
                           ("dclk","clock_infifo_enq_2","None","None","clock_symrate","None"),
@@ -123,7 +123,7 @@ object tb_f2_rx_dsp {
                           ("in","reset_outfifo","None","None","None",1),
                           ("in","reset_adcfifo","None","None","None",1),
                           ("in","reset_infifo","None","None","None",1),
-                          ("in","rx_output_mode",rx_output_modebits-1,0,"None","None"),
+                          ("in","rx_output_mode",rx_output_modebits-1,0,"None","g_rx_output_mode"),
                           ("in","input_mode",input_modebits-1,0,"None","None"),
                           ("in","adc_fifo_lut_mode",adc_fifo_lut_modebits-1,0,"None","g_adc_fifo_lut_mode"),
                           ("in","inv_adc_clk_pol_0","None","None","None","g_inv_adc_clk_pol"),
@@ -382,10 +382,10 @@ object tb_f2_rx_dsp {
                         |//Clock definitions
                         |always #(c_Ts/2.0)clock = !clock ;
                         | 
-                        |//Read this with Ouput fifo enquque clk
-                        |always @(posedge io_clock_symrate ) begin 
+                        |//Read this with Ouput fifo dequque clk
+                        |always @(posedge clock ) begin 
                         |    //Print only valid values 
-                        |    if (~$isunknown(io_ofifo_bits_data_0_udata_real) && (initdone==1) ) begin
+                        |    if (~$isunknown(io_ofifo_bits_data_0_udata_real) && (initdone==1) && (io_ofifo_valid==1) ) begin
                         |        $fwrite(outfile, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", 
                         |                         io_ofifo_bits_data_0_udata_real, io_ofifo_bits_data_0_udata_imag, 
                         |                         io_ofifo_bits_data_1_udata_real, io_ofifo_bits_data_1_udata_imag, 
