@@ -1,6 +1,6 @@
-// Initially written by Marko Kosunen, marko.kosunen@aalto.fi 
+
 // May  2018
-// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 04.09.2018 22:38
+// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 20.11.2018 11:47
 //
 // Input control parameters signals:
 // The capacity of the output is users*datarate, so if we want to monitor all data 
@@ -84,7 +84,7 @@ class usersigzeros(val n: Int, val users: Int=4) extends Bundle {
     val userzero   = 0.U.asTypeOf(new usersigs(n=n,users=users))
     val udatazero  = 0.U.asTypeOf(userzero.data)
     val uindexzero = 0.U.asTypeOf(userzero.uindex)
-    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n))
+    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n,users=users))
     val datazero   = 0.U.asTypeOf(iofifozero.data)
     val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
 }
@@ -105,7 +105,7 @@ class f2_rx_dsp_io(
     val decimator_controls = Vec(antennas,new f2_decimator_controls(resolution=resolution,gainbits=10))    
     val adc_clocks         = Input(Vec(antennas,Clock()))
     val clock_symrate      = Input(Clock())
-    val clock_symratex4    = Input(Clock())
+    val clock_symratex4    = Input(Clock()) //Should be x users if serial streaming is to be enabled
     val clock_outfifo_deq  = Input(Clock())
     val clock_infifo_enq   = Input(Vec(neighbours,Clock()))
     val user_index         = Input(UInt(log2Ceil(users).W)) //W should be log2 of users
@@ -122,7 +122,7 @@ class f2_rx_dsp_io(
     val adc_lut_write_vals = Input(Vec(antennas,DspComplex(SInt(inputn.W), SInt(inputn.W))))
     val adc_lut_write_en   = Input(Bool())
     val adc_lut_reset      = Input(Bool())
-    val ofifo              = DecoupledIO(new iofifosigs(n=n))
+    val ofifo              = DecoupledIO(new iofifosigs(n=n,users=users))
     val iptr_fifo          = Vec(neighbours,Flipped(DecoupledIO(new iofifosigs(n=n,users=users))))
     val rx_user_delays     = Input(Vec(antennas, Vec(users,UInt(log2Ceil(progdelay).W))))
     val rx_fine_delays     = Input(Vec(antennas,UInt(log2Ceil(finedelay).W)))
@@ -159,7 +159,7 @@ class f2_rx_dsp (
     val userzero   = 0.U.asTypeOf(new usersigs(n=n,users=users))
     val udatazero  = 0.U.asTypeOf(userzero.data)
     val uindexzero = 0.U.asTypeOf(userzero.uindex)
-    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n))
+    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n,users=users))
     val datazero   = 0.U.asTypeOf(iofifozero.data)
     val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
 
@@ -193,9 +193,10 @@ class f2_rx_dsp (
     (rx_path,io.rx_user_weights).zipped.map(_.adc_ioctrl.user_weights:=_)
 
     //Input fifo from serdes
-    val infifo = Seq.fill(neighbours){Module(new AsyncQueue(new iofifosigs(n=n),depth=fifodepth)).io}
+    val infifo = Seq.fill(neighbours){Module(new AsyncQueue(new iofifosigs(n=n, users=users),depth=fifodepth)).io}
 
-    //Contains indexes
+    //Contains user indexes
+    // usersigs is only for a single user therefore needs a Seq
     val delayproto=new usersigs(n=n,users=users)
     val r_iptr_fifo= Seq.fill(neighbours){ 
         Seq.fill(users){
@@ -236,7 +237,7 @@ class f2_rx_dsp (
     }
  
     //This is a wire for various mode assignments 
-    val w_Z = Wire( new iofifosigs(n=n))
+    val w_Z = Wire( new iofifosigs(n=n,users=users))
 
     // First we generate all possible output signals, then we just select The one we want.
     //Generate the sum of users
@@ -254,9 +255,11 @@ class f2_rx_dsp (
     sumneighbourstream.data.map(_.uindex:=uindexzero)
     
     //Sum the inputs from neighbours
+    // r_iptr_fifo is a two dimensional Seq(neighbour,user)
+    //form a seq of user data for every neighbour and sum them
     for (user <-0 to users-1){
         sumneighbourstream.data(user).udata:=r_iptr_fifo.map(
-            r_iptr_fifo => r_iptr_fifo(user).optr_Z.data.udata
+            neighbour => neighbour(user).optr_Z.data.udata
         ).foldRight(DspComplex(0.S(n.W), 0.S(n.W)))(
                 (usrleft,usrright)=> usrleft+usrright
             )
@@ -294,38 +297,6 @@ class f2_rx_dsp (
         selrxuser.rxindex:=io.antenna_index
         selrxuser.data.drop(1).map(_.data:=userzero)
   
-
-    //State counter to select the user or branch to the output
-    val rxindex=withClockAndReset(io.clock_symratex4,io.reset_outfifo)(
-        RegInit(0.U(2.W))
-    )
-    when ( ! io.reset_index_count ) {
-        when (rxindex === 3.U) {
-            rxindex:=0.U
-        } .otherwise {
-            rxindex := rxindex+1.U(1.W)
-        }
-    } .otherwise {
-        rxindex := 0.U
-    }
-  
-    // Indexed user stream
-    val indexeduserstream = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(
-        RegInit(iofifozero)
-    )
-    (indexeduserstream.data,rx_path).zipped.map(_.udata:=_.Z(rxindex))
-    indexeduserstream.data.map(_.uindex:=rxindex)
-    indexeduserstream.rxindex:=rxindex
-
-    // Indexed RX stream
-    val indexedrxstream = withClockAndReset(io.clock_symratex4,io.reset_outfifo)(
-        RegInit(iofifozero)
-    )
-    (indexedrxstream.data,rx_path(rxindex).Z).zipped.map(_.udata:=_)
-    indexedrxstream.data.map(_.uindex:=rxindex)
-    indexedrxstream.rxindex:=rxindex
-
-
     //Selection part starts here
     //State definitions for the selected mode. Just to map numbers to understandable labels
     val ( bypass :: select_users  :: select_antennas :: select_both 
@@ -354,66 +325,61 @@ class f2_rx_dsp (
 
     // Fifo for ther output
     val proto=UInt((4*2*n+2).W)
-    val outfifo = Module(new AsyncQueue(new iofifosigs(n=n),depth=fifodepth)).io
+    val outfifo = Module(new AsyncQueue(new iofifosigs(n=n,users=users),depth=fifodepth)).io
 
     //Defaults
     outfifo.enq_reset:=io.reset_outfifo 
-    outfifo.enq_clock:=io.clock_symratex4
+    outfifo.enq_clock:=io.clock_symrate
     outfifo.deq_reset:=io.reset_outfifo
     outfifo.deq.ready:=io.ofifo.ready
     outfifo.deq_clock:=io.clock_outfifo_deq
     io.ofifo.valid   := outfifo.deq.valid
 
     //Put something out if nothing else defined
-    (w_Z.data,rx_path).zipped.map(_.udata:=_.Z(0))
+    (w_Z.data,rx_path(0).Z).zipped.map(_.udata:=_)
      w_Z.data.map(_.uindex:=uindexzero)
      w_Z.rxindex:=rxindexzero
 
-    // Clock multiplexing tricky to implement. 
-    // Use valid to control output rate.
-    //val edges_symratex4 =  withClock(io.clock_symratex4){Module( new edge_detector()).io} 
-    //edges_symratex4.A :=io.clock_symratex4.asUInt
-    val edges_symrate =  withClock(io.clock_symratex4){Module( new edge_detector()).io} 
-    edges_symrate.A :=io.clock_symrate.asUInt
-
     //Mode operation definitions
     when( mode===bypass ) {
-        (w_Z.data,rx_path).zipped.map(_.udata:=_.Z(0))
+        (w_Z.data,rx_path(0).Z).zipped.map(_.udata:=_)
          w_Z.rxindex := rxindexzero
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===select_users ) {
          w_Z:=RegNext(seluser)
-         outfifo.enq.valid :=  edges_symrate.rising   
-         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready  :=  true.B)   
     }.elsewhen ( mode===select_antennas ) {
          w_Z:=RegNext(selrx)
-         outfifo.enq.valid :=  edges_symrate.rising   
-         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready  :=  true.B)   
     }.elsewhen ( mode===select_both ) {
          w_Z:=RegNext(selrxuser)
-         outfifo.enq.valid :=  edges_symrate.rising   
-         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready  :=  true.B)   
     }.elsewhen  (mode===stream_users ) {
-         w_Z := RegNext(indexeduserstream)    
-         //outfifo.enq.valid :=  edges_symratex4.rising   
-         outfifo.enq.valid :=  true.B
-         //infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
-         infifo.map(_.deq.ready  :=  true.B) 
+         // Simplified, 16 users will blow the IO rate
+         // Just another variant for debugging
+         (w_Z.data,rx_path(1).Z).zipped.map(_.udata:=_)
+         w_Z.rxindex := 1.U 
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===stream_rx ) {
-         w_Z := RegNext(indexedrxstream)    
-         //outfifo.enq.valid :=  edges_symratex4.rising   
-         outfifo.enq.valid :=  true.B
-         //infifo.map(_.deq.ready  :=  edges_symratex4.rising) 
-         infifo.map(_.deq.ready  :=  true.B) 
+         //Simplified, became obsolete 16 users will blow the IO rate
+         // Just another variant for debugging
+         (w_Z.data,rx_path(2).Z).zipped.map(_.udata:=_)
+         w_Z.rxindex := 2.U
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===stream_sum ) {
          w_Z:= RegNext(sumusersstream)    
-         outfifo.enq.valid :=  edges_symrate.rising   
-         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready  :=  true.B)   
     }.otherwise {
           w_Z  := RegNext(sumusersstream)
-         outfifo.enq.valid :=  edges_symrate.rising   
-         infifo.map(_.deq.ready  :=  edges_symrate.rising)   
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready  :=  true.B)   
     }
     
     //Here we reformat the output
@@ -428,6 +394,6 @@ class f2_rx_dsp (
 
 //This gives you verilog
 object f2_rx_dsp extends App {
-  chisel3.Driver.execute(args, () => new f2_rx_dsp(inputn=9, resolution=32,n=16, antennas=4, users=4, fifodepth=128 ))
+  chisel3.Driver.execute(args, () => new f2_rx_dsp(inputn=9, resolution=32,n=16, antennas=4, users=16, fifodepth=128 ))
 }
 
