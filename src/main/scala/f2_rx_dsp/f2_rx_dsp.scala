@@ -96,8 +96,8 @@ class f2_rx_dsp_io(
         val antennas  : Int=4, 
         val users     : Int=4,
         val neighbours: Int=4,
-        val progdelay : Int=64,
-        val finedelay : Int=32,
+        val progdelay : Int=63,
+        val finedelay : Int=31,
         val weightbits: Int=10
     ) extends Bundle {
     val iptr_A             = Input(Vec(antennas,DspComplex(SInt(inputn.W), SInt(inputn.W))))
