@@ -1,4 +1,3 @@
-
 // May  2018
 // Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 20.11.2018 11:47
 //
@@ -136,7 +135,7 @@ class f2_rx_dsp (
         resolution : Int=32, 
         antennas   : Int=4, 
         users      : Int=4, 
-        fifodepth  : Int=128, 
+        fifodepth  : Int=16, 
         neighbours : Int=4,
         progdelay  : Int=64,
         finedelay  : Int=32,
@@ -216,7 +215,7 @@ class f2_rx_dsp (
     infifo.map(_.enq_reset:=io.reset_infifo)
     (infifo,io.iptr_fifo).zipped.map(_.enq<>_)
     (infifo,io.clock_infifo_enq).zipped.map(_.enq_clock:=_)
-    infifo.map(_.deq_clock :=clock)  //Fastest possible clock. Rate controlled by ready
+    infifo.map(_.deq_clock :=io.clock_symrate)
 
     when (io.input_mode===0.U) {
         inputmode := zero
@@ -394,6 +393,6 @@ class f2_rx_dsp (
 
 //This gives you verilog
 object f2_rx_dsp extends App {
-  chisel3.Driver.execute(args, () => new f2_rx_dsp(inputn=9, resolution=32,n=16, antennas=4, users=16, fifodepth=128 ))
+  chisel3.Driver.execute(args, () => new f2_rx_dsp(inputn=9, resolution=32,n=16, antennas=4, users=16, fifodepth=16 ))
 }
 
