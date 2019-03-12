@@ -63,6 +63,7 @@ import f2_decimator._
 import f2_rx_path._
 import prog_delay._
 import edge_detector._
+import dcpipe._
 
 
 //Consider using "unit" instead of "User" 
@@ -76,16 +77,6 @@ class iofifosigs(val n: Int, val users: Int=4 ) extends Bundle {
         val data=Vec(users,new usersigs(n=n,users=users))
         val rxindex=UInt(2.W)
         override def cloneType = (new iofifosigs(n,users)).asInstanceOf[this.type]
-}
-
-//Constants
-class usersigzeros(val n: Int, val users: Int=4) extends Bundle { 
-    val userzero   = 0.U.asTypeOf(new usersigs(n=n,users=users))
-    val udatazero  = 0.U.asTypeOf(userzero.data)
-    val uindexzero = 0.U.asTypeOf(userzero.uindex)
-    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n,users=users))
-    val datazero   = 0.U.asTypeOf(iofifozero.data)
-    val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
 }
 
 class f2_rx_dsp_io(
@@ -106,7 +97,7 @@ class f2_rx_dsp_io(
     val clock_symrate      = Input(Clock())
     val clock_symratex4    = Input(Clock()) //Should be x users if serial streaming is to be enabled
     val clock_outfifo_deq  = Input(Clock())
-    val clock_infifo_enq   = Input(Vec(neighbours,Clock()))
+    val clock_infifo_enq   = Input(Clock())
     val user_index         = Input(UInt(log2Ceil(users).W)) //W should be log2 of users
     val antenna_index      = Input(UInt(log2Ceil(antennas).W)) //W should be log2 of users
     val reset_index_count  = Input(Bool())
@@ -139,7 +130,8 @@ class f2_rx_dsp (
         neighbours : Int=4,
         progdelay  : Int=64,
         finedelay  : Int=32,
-        weightbits : Int=10
+        weightbits : Int=10,
+        pipestages : Int=2
     ) extends Module {
     val io = IO( 
         new f2_rx_dsp_io(
@@ -155,10 +147,12 @@ class f2_rx_dsp (
     )
     //Zeros
     //val z = new usersigzeros(n=n, users=users)
-    val userzero   = 0.U.asTypeOf(new usersigs(n=n,users=users))
+    val userproto  = new usersigs(n=n,users=users).cloneType
+    val proto      = new iofifosigs(n=n,users=users).cloneType
+    val userzero   = 0.U.asTypeOf(userproto.cloneType)
     val udatazero  = 0.U.asTypeOf(userzero.data)
     val uindexzero = 0.U.asTypeOf(userzero.uindex)
-    val iofifozero = 0.U.asTypeOf(new iofifosigs(n=n,users=users))
+    val iofifozero = 0.U.asTypeOf(proto.cloneType)
     val datazero   = 0.U.asTypeOf(iofifozero.data)
     val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
 
@@ -191,15 +185,17 @@ class f2_rx_dsp (
     (rx_path,io.rx_fine_delays).zipped.map(_.adc_ioctrl.fine_delays:=_)
     (rx_path,io.rx_user_weights).zipped.map(_.adc_ioctrl.user_weights:=_)
 
-    //Input fifo from serdes
-    val infifo = Seq.fill(neighbours){Module(new AsyncQueue(new iofifosigs(n=n, users=users),depth=fifodepth)).io}
+    // Pipeline stages to alleviate place and route
+    //val inpipe = Seq.fill(neighbours){ withClockAndReset(io.clock_infifo_enq,io.reset_infifo){ Module(new dcpipe(proto.cloneType,latency=pipestages)).io} }
 
+    //Input fifo from serdes
+    val infifo = Seq.fill(neighbours){Module(new AsyncQueue(proto.cloneType,depth=fifodepth)).io}
+     
     //Contains user indexes
     // usersigs is only for a single user therefore needs a Seq
-    val delayproto=new usersigs(n=n,users=users)
     val r_iptr_fifo= Seq.fill(neighbours){ 
         Seq.fill(users){
-            withClock(io.clock_symrate)( Module( new prog_delay(delayproto, maxdelay=progdelay)).io)
+            withClock(io.clock_symrate)( Module( new prog_delay(userproto.cloneType, maxdelay=progdelay)).io)
         }        
     }
     
@@ -214,7 +210,11 @@ class f2_rx_dsp (
     infifo.map(_.deq_reset:=io.reset_infifo)
     infifo.map(_.enq_reset:=io.reset_infifo)
     (infifo,io.iptr_fifo).zipped.map(_.enq<>_)
-    (infifo,io.clock_infifo_enq).zipped.map(_.enq_clock:=_)
+    //(inpipe,io.iptr_fifo).zipped.map(_.enq<>_)
+    //Inpipe does not have ready.
+    io.iptr_fifo.map(_.ready:=true.B)
+    //(infifo,inpipe).zipped.map(_.enq<>_.deq)
+    infifo.map(_.enq_clock:=io.clock_infifo_enq)
     infifo.map(_.deq_clock :=io.clock_symrate)
 
     when (io.input_mode===0.U) {
@@ -236,7 +236,7 @@ class f2_rx_dsp (
     }
  
     //This is a wire for various mode assignments 
-    val w_Z = Wire( new iofifosigs(n=n,users=users))
+    val w_Z = Wire(proto.cloneType)
 
     // First we generate all possible output signals, then we just select The one we want.
     //Generate the sum of users
@@ -272,7 +272,11 @@ class f2_rx_dsp (
                 (usrleft,usrright)=> usrleft+usrright
           )
     }
-  
+    val sumuserspipe = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
+        Module( new Pipe(proto.cloneType,latency=pipestages)).io
+    )
+    sumuserspipe.enq.bits:=sumusersstream
+    sumuserspipe.enq.valid:=true.B
   
     //All antennas, single user
     val seluser = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
@@ -323,8 +327,8 @@ class f2_rx_dsp (
     }
 
     // Fifo for ther output
-    val proto=UInt((4*2*n+2).W)
-    val outfifo = Module(new AsyncQueue(new iofifosigs(n=n,users=users),depth=fifodepth)).io
+    //val proto=UInt((4*2*n+2).W)
+    val outfifo = Module(new AsyncQueue(proto.cloneType,depth=fifodepth)).io
 
     //Defaults
     outfifo.enq_reset:=io.reset_outfifo 
@@ -372,11 +376,11 @@ class f2_rx_dsp (
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===stream_sum ) {
-         w_Z:= RegNext(sumusersstream)    
+         w_Z:= RegNext(sumuserspipe.deq.bits)    
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }.otherwise {
-          w_Z  := RegNext(sumusersstream)
+          w_Z  := RegNext(sumuserspipe.deq.bits)
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }
