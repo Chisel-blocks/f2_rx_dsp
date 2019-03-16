@@ -1,5 +1,4 @@
-// May  2018
-// Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 20.11.2018 11:47
+// Initially wtritten by Marko Kosunen, marko.kosunen@aalto.fi, 20.11.2018 11:47 May  2018
 //
 // Input control parameters signals:
 // The capacity of the output is users*datarate, so if we want to monitor all data 
@@ -43,7 +42,7 @@
 // rx_user_weights       :
 //
 // Clocking: 
-//                       clock is the highest clock rate
+//                       clock SHOULD NOT BE USED FOR ANYTHING,This is a multirate design
 //                       clock_symrate is the lowest clock rate, BB symbol rate
 //               
 /////////////////////////////////////////////////////////////////////////////
@@ -64,6 +63,7 @@ import f2_rx_path._
 import prog_delay._
 import edge_detector._
 import dcpipe._
+import clkmux._
 
 
 //Consider using "unit" instead of "User" 
@@ -156,6 +156,12 @@ class f2_rx_dsp (
     val datazero   = 0.U.asTypeOf(iofifozero.data)
     val rxindexzero= 0.U.asTypeOf(iofifozero.rxindex)
 
+
+    // clock multiplexer for the Bypass mode
+    val output_clkmux=Module (new clkmux()).io
+    //Master clock is the fastest
+    output_clkmux.c0:=clock
+    output_clkmux.c1:=io.clock_symrate
     //-The RX:s
     // Vec is required to do runtime adressing of an array i.e. Seq is not hardware structure
     val rx_path  = VecInit(Seq.fill(antennas){ 
@@ -205,7 +211,7 @@ class f2_rx_dsp (
 
     
     val zero :: userssum :: Nil = Enum(2)
-    val inputmode=RegInit(zero)
+    val inputmode=withClock(io.clock_symrate)(RegInit(zero))
     
     infifo.map(_.deq_reset:=io.reset_infifo)
     infifo.map(_.enq_reset:=io.reset_infifo)
@@ -305,7 +311,7 @@ class f2_rx_dsp (
     val ( bypass :: select_users  :: select_antennas :: select_both 
         :: stream_users :: stream_rx :: stream_sum :: Nil ) = Enum(7) 
     //Select state
-    val mode=RegInit(bypass)
+    val mode=withClock(io.clock_symrate)(RegInit(bypass))
     
     //Decoder for the modes
     when (io.rx_output_mode===0.U) {
@@ -340,25 +346,29 @@ class f2_rx_dsp (
 
     //Put something out if nothing else defined
     (w_Z.data,rx_path(0).Z).zipped.map(_.udata:=_)
+     output_clkmux.sel:=1.U
      w_Z.data.map(_.uindex:=uindexzero)
      w_Z.rxindex:=rxindexzero
 
     //Mode operation definitions
     when( mode===bypass ) {
-        (w_Z.data,rx_path(0).Z).zipped.map(_.udata:=_)
+        // This is really a bypass, intended to debug the receiver
+         output_clkmux.sel:=0.U
+         w_Z:=iofifozero 
+         w_Z.data(0).udata:=rx_path(0).bypass_out
          w_Z.rxindex := rxindexzero
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===select_users ) {
-         w_Z:=RegNext(seluser)
+         w_Z:=withClock(io.clock_symrate)(RegNext(seluser))
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }.elsewhen ( mode===select_antennas ) {
-         w_Z:=RegNext(selrx)
+         w_Z:=withClock(io.clock_symrate)(RegNext(selrx))
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }.elsewhen ( mode===select_both ) {
-         w_Z:=RegNext(selrxuser)
+         w_Z:=withClock(io.clock_symrate)(RegNext(selrxuser))
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }.elsewhen  (mode===stream_users ) {
@@ -376,11 +386,11 @@ class f2_rx_dsp (
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===stream_sum ) {
-         w_Z:= RegNext(sumuserspipe.deq.bits)    
+         w_Z:= withClock(io.clock_symrate)(RegNext(sumuserspipe.deq.bits))    
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }.otherwise {
-          w_Z  := RegNext(sumuserspipe.deq.bits)
+          w_Z  := withClock(io.clock_symrate)(RegNext(sumuserspipe.deq.bits))
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }
