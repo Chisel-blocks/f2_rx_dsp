@@ -338,7 +338,7 @@ class f2_rx_dsp (
 
     //Defaults
     outfifo.enq_reset:=io.reset_outfifo 
-    outfifo.enq_clock:=io.clock_symrate
+    outfifo.enq_clock:=output_clkmux.co
     outfifo.deq_reset:=io.reset_outfifo
     outfifo.deq.ready:=io.ofifo.ready
     outfifo.deq_clock:=io.clock_outfifo_deq
