@@ -150,7 +150,7 @@ class f2_rx_dsp (
     val userproto  = new usersigs(n=n,users=users).cloneType
     val proto      = new iofifosigs(n=n,users=users).cloneType
     val userzero   = 0.U.asTypeOf(userproto.cloneType)
-    val udatazero  = 0.U.asTypeOf(userzero.data)
+    val udatazero  = 0.U.asTypeOf(userzero.udata)
     val uindexzero = 0.U.asTypeOf(userzero.uindex)
     val iofifozero = 0.U.asTypeOf(proto.cloneType)
     val datazero   = 0.U.asTypeOf(iofifozero.data)
@@ -162,6 +162,7 @@ class f2_rx_dsp (
     //Master clock is the fastest
     output_clkmux.c0:=clock
     output_clkmux.c1:=io.clock_symrate
+
     //-The RX:s
     // Vec is required to do runtime adressing of an array i.e. Seq is not hardware structure
     val rx_path  = VecInit(Seq.fill(antennas){ 
@@ -345,7 +346,9 @@ class f2_rx_dsp (
     io.ofifo.valid   := outfifo.deq.valid
 
     //Put something out if nothing else defined
-    (w_Z.data,rx_path(0).Z).zipped.map(_.udata:=_)
+    // This is floorplan related selection. Only RX3 has analog test output
+    val rxtoprobe=3
+    (w_Z.data,rx_path(rxtoprobe).Z).zipped.map(_.udata:=_)
      output_clkmux.sel:=1.U
      w_Z.data.map(_.uindex:=uindexzero)
      w_Z.rxindex:=rxindexzero
@@ -355,7 +358,8 @@ class f2_rx_dsp (
         // This is really a bypass, intended to debug the receiver
          output_clkmux.sel:=0.U
          w_Z:=iofifozero 
-         w_Z.data(0).udata:=rx_path(0).bypass_out
+         //user0
+         w_Z.data(0).udata:=rx_path(rxtoprobe).bypass_out
          w_Z.rxindex := rxindexzero
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready :=  true.B)   
