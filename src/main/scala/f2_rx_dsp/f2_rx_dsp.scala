@@ -212,7 +212,8 @@ class f2_rx_dsp (
 
     
     val zero :: userssum :: Nil = Enum(2)
-    val inputmode=withClock(io.clock_symrate)(RegInit(zero))
+    //Select state with fast undivided, unresettable master clock
+    val inputmode=RegInit(zero)
     
     infifo.map(_.deq_reset:=io.reset_infifo)
     infifo.map(_.enq_reset:=io.reset_infifo)
@@ -254,7 +255,8 @@ class f2_rx_dsp (
     sumusersstream.rxindex:=rxindexzero
     sumusersstream.data.map(_.uindex:=uindexzero)
 
-    val sumneighbourstream = withClockAndReset(io.clock_symrate,io.reset_outfifo)(
+    // Neighbour sum is only dependednt on infifo
+    val sumneighbourstream = withClockAndReset(io.clock_symrate,io.reset_infifo)(
         RegInit(iofifozero)
     )
     sumneighbourstream.rxindex:=rxindexzero
@@ -311,8 +313,9 @@ class f2_rx_dsp (
     //State definitions for the selected mode. Just to map numbers to understandable labels
     val ( bypass :: select_users  :: select_antennas :: select_both 
         :: stream_users :: stream_rx :: stream_sum :: Nil ) = Enum(7) 
-    //Select state
-    val mode=withClock(io.clock_symrate)(RegInit(bypass))
+
+    //Select state with fast undivided, unresettable master clock
+    val mode=RegInit(bypass)
     
     //Decoder for the modes
     when (io.rx_output_mode===0.U) {
@@ -324,8 +327,10 @@ class f2_rx_dsp (
     }.elsewhen (io.rx_output_mode===3.U) {
         mode:=select_both
     }.elsewhen (io.rx_output_mode===4.U) {
+        // Currently redundant mode
         mode:=stream_users
     }.elsewhen (io.rx_output_mode===5.U) {
+        // Currently redundant mode
         mode:=stream_rx
     }.elsewhen (io.rx_output_mode===6.U) {
         mode:=stream_sum
@@ -376,17 +381,14 @@ class f2_rx_dsp (
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }.elsewhen  (mode===stream_users ) {
-         // Simplified, 16 users will blow the IO rate
-         // Just another variant for debugging
+         // Currently redundant mode
+         w_Z  := withClock(io.clock_symrate)(RegNext(sumuserspipe.deq.bits))
+         outfifo.enq.valid :=  true.B   
+         infifo.map(_.deq.ready  :=  true.B)   
+    }.elsewhen ( mode===stream_rx ) {
+         // Currently redundant mode
          (w_Z.data,rx_path(1).Z).zipped.map(_.udata:=_)
          w_Z.rxindex := 1.U 
-         outfifo.enq.valid :=  true.B   
-         infifo.map(_.deq.ready :=  true.B)   
-    }.elsewhen ( mode===stream_rx ) {
-         //Simplified, became obsolete 16 users will blow the IO rate
-         // Just another variant for debugging
-         (w_Z.data,rx_path(2).Z).zipped.map(_.udata:=_)
-         w_Z.rxindex := 2.U
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===stream_sum ) {
@@ -394,7 +396,7 @@ class f2_rx_dsp (
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }.otherwise {
-          w_Z  := withClock(io.clock_symrate)(RegNext(sumuserspipe.deq.bits))
+         w_Z  := withClock(io.clock_symrate)(RegNext(sumuserspipe.deq.bits))
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready  :=  true.B)   
     }
@@ -406,7 +408,6 @@ class f2_rx_dsp (
         outfifo.enq.bits:=iofifozero
     }
     io.ofifo.bits :=  outfifo.deq.bits
-
 }
 
 //This gives you verilog
