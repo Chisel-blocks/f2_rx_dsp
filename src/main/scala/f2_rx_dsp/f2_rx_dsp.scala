@@ -95,7 +95,8 @@ class f2_rx_dsp_io(
     val decimator_controls = Vec(antennas,new f2_decimator_controls(resolution=resolution,gainbits=10))    
     val adc_clocks         = Input(Vec(antennas,Clock()))
     val clock_symrate      = Input(Clock())
-    val clock_symratex4    = Input(Clock()) //Should be x users if serial streaming is to be enabled
+    val bypass_clock       = Input(Clock()) // Clock for the bypass mode
+    val bypass_Ndiv        = Input(UInt(8.W))//Division consistent with other dividers
     val clock_outfifo_deq  = Input(Clock())
     val clock_infifo_enq   = Input(Clock())
     val user_index         = Input(UInt(log2Ceil(users).W)) //W should be log2 of users
@@ -160,7 +161,7 @@ class f2_rx_dsp (
     // clock multiplexer for the Bypass mode
     val output_clkmux=Module (new clkmux()).io
     //Master clock is the fastest
-    output_clkmux.c0:=clock
+    output_clkmux.c0:=io.bypass_clock
     output_clkmux.c1:=io.clock_symrate
 
     //-The RX:s
@@ -180,6 +181,8 @@ class f2_rx_dsp (
     (rx_path,io.decimator_controls).zipped.map(_.decimator_controls:=_)
     rx_path.map(_.decimator_clocks:=io.decimator_clocks) 
     (rx_path,io.iptr_A).zipped.map(_.iptr_A:=_)
+    rx_path.map(_.bypass_Ndiv:=io.bypass_Ndiv)
+    rx_path.map(_.bypass_clock:=io.bypass_clock)
     (rx_path,io.inv_adc_clk_pol).zipped.map(_.adc_ioctrl.inv_adc_clk_pol:=_)
     rx_path.map(_.adc_ioctrl.adc_fifo_lut_mode:=io.adc_fifo_lut_mode)
     rx_path.map(_.adc_ioctrl.adc_lut_write_addr:=io.adc_lut_write_addr)
@@ -212,8 +215,8 @@ class f2_rx_dsp (
 
     
     val zero :: userssum :: Nil = Enum(2)
-    //Select state with fast undivided, unresettable master clock
-    val inputmode=RegInit(zero)
+    //Select state with slow_clock, gate other clocks if needed
+    val inputmode=withClock(io.clock_symrate){ RegInit(zero) }
     
     infifo.map(_.deq_reset:=io.reset_infifo)
     infifo.map(_.enq_reset:=io.reset_infifo)
@@ -362,10 +365,8 @@ class f2_rx_dsp (
     when( mode===bypass ) {
         // This is really a bypass, intended to debug the receiver
          output_clkmux.sel:=0.U
-         w_Z:=iofifozero 
-         //user0
-         w_Z.data(0).udata:=rx_path(rxtoprobe).bypass_out
-         w_Z.rxindex := rxindexzero
+         (w_Z.data,rx_path(rxtoprobe).bypass_out).zipped.map(_.udata:=_)
+         w_Z.rxindex := rxtoprobe.asUInt
          outfifo.enq.valid :=  true.B   
          infifo.map(_.deq.ready :=  true.B)   
     }.elsewhen ( mode===select_users ) {
