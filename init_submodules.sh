@@ -3,24 +3,32 @@
 DIR="$( cd "$( dirname $0 )" && pwd )"
 git submodule update --init
 
+#Dependency satisfied by submodule f2_rx_path
 #Publish local the ones you need
-#cd $DIR/clkdiv_n_2_4_8
-#sbt publishLocal
-
-#Selectively, init submodules of a larger projects
 #cd $DIR/rocket-chip
-#git submodule update --init chisel3
 #git submodule update --init firrtl
+#git submodule update --init chisel3
 #git submodule update --init hardfloat
-
-#Recursively update submodeles
-#cd $DIR/eagle_serdes
-#git submodule update --init --recursive serdes_top
-#sbt publishLocal
-#Assemble executables
-###sbt publishing
+#
 #cd $DIR/rocket-chip/firrtl
 #sbt publishLocal
-#sbt assembly
+#cd $DIR/rocket-chip/chisel3
+#sbt publishLocal
+
+#cd $DIR/rocket-chip
+#sbt publishLocal
+
+SUBMODULES="\
+    f2_rx_path \
+    edge_detector \
+    " 
+for module in $SUBMODULES; do
+    cd ${DIR}/${module}
+    if [ -f "./init_submodules.sh" ]; then
+        ./init_submodules.sh
+    fi
+    sbt publishLocal
+done
 
 exit 0
+
