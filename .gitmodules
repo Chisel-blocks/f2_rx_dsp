@@ -7,3 +7,6 @@
 [submodule "dcpipe"]
 	path = dcpipe
 	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/dcpipe.git
+[submodule "f2_signal_definitions"]
+	path = f2_signal_definitions
+	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/f2_signal_definitions.git
