@@ -95,6 +95,7 @@ libraryDependencies += "berkeley" %% "rocketchip" % "1.2"
 libraryDependencies += "edu.berkeley.cs" %% "f2_rx_path" % gitSubmoduleHashSnapshotVersion("f2_rx_path")
 libraryDependencies += "edu.berkeley.cs" %% "edge_detector" % gitSubmoduleHashSnapshotVersion("edge_detector")
 libraryDependencies += "edu.berkeley.cs" %% "dcpipe" % gitSubmoduleHashSnapshotVersion("dcpipe")
+libraryDependencies += "edu.berkeley.cs" %% "f2_signal_definitions" % gitSubmoduleHashSnapshotVersion("f2_signal_definitions")
 //libraryDependencies += "edu.berkeley.eecs" %% "ofdm" % "0.1"
 //libraryDependencies += "edu.berkeley.cs" %% "eagle_serdes" % "0.0-SNAPSHOT"
 

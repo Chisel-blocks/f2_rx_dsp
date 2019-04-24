@@ -18,9 +18,12 @@ git submodule update --init
 #cd $DIR/rocket-chip
 #sbt publishLocal
 
+#Prog_delay and clkmux are included in f2_rx_path
 SUBMODULES="\
     f2_rx_path \
     edge_detector \
+    dcpipe \
+    f2_signal_definitions \
     " 
 for module in $SUBMODULES; do
     cd ${DIR}/${module}

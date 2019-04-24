@@ -58,6 +58,7 @@ import chisel3.experimental._
 import dsptools._
 import dsptools.numbers._
 import freechips.rocketchip.util._
+import f2_signal_definitions.{usersigs, iofifosigs}
 import f2_decimator._
 import f2_rx_path._
 import prog_delay._
