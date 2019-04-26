@@ -61,9 +61,9 @@ resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositori
 // Provide a managed dependency on X if -DXVersion="" is supplied on the command line.
 // [TODO] is simpler clearer?
 val defaultVersions = Map(
-  "chisel3" -> "3.2-SNAPSHOT",
-  "chisel-iotesters" -> "1.2.5",
-  "dsptools" -> "1.1.4"
+  "chisel3" -> "3.1.7",
+  "chisel-iotesters" -> "1.2.9",
+  "dsptools" -> "1.1.8"
   )
 
 libraryDependencies ++= (Seq("chisel3","chisel-iotesters","dsptools").map {
@@ -88,10 +88,10 @@ libraryDependencies  ++= Seq(
   "org.scalanlp" %% "breeze-viz" % "0.13.2"
 )
 
-// Some common deps in BWRC projects, select if needed
-// TODO-how to figure out what version is the current and the best?
-libraryDependencies += "edu.berkeley.cs" %% "dsptools" % "1.1-SNAPSHOT"
+//Needed by the rocket chip
+libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.2-SNAPSHOT"
 libraryDependencies += "berkeley" %% "rocketchip" % "1.2"
+
 libraryDependencies += "edu.berkeley.cs" %% "f2_rx_path" % gitSubmoduleHashSnapshotVersion("f2_rx_path")
 libraryDependencies += "edu.berkeley.cs" %% "edge_detector" % gitSubmoduleHashSnapshotVersion("edge_detector")
 libraryDependencies += "edu.berkeley.cs" %% "dcpipe" % gitSubmoduleHashSnapshotVersion("dcpipe")
