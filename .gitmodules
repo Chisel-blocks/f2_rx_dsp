@@ -3,7 +3,7 @@
 	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/f2_rx_path.git
 [submodule "edge_detector"]
 	path = edge_detector
-	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/edge_detector.git
+	url = git@github.com:Chisel-blocks/edge_detector.git
 [submodule "dcpipe"]
 	path = dcpipe
 	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/dcpipe.git
