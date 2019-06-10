@@ -1,6 +1,6 @@
 [submodule "f2_rx_path"]
 	path = f2_rx_path
-	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/f2_rx_path.git
+	url = git@github.com/Chisel-blocks/f2_rx_path.git
 [submodule "edge_detector"]
 	path = edge_detector
 	url = git@github.com:Chisel-blocks/edge_detector.git
