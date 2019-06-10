@@ -6,7 +6,7 @@
 	url = git@github.com:Chisel-blocks/edge_detector.git
 [submodule "dcpipe"]
 	path = dcpipe
-	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/dcpipe.git
+	url = git@github.com:Chisel-blocks/dcpipe.git
 [submodule "f2_signal_definitions"]
 	path = f2_signal_definitions
-	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/f2_signal_definitions.git
+	url = git@github.com:Chisel-blocks/f2_signal_definitions.git
