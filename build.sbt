@@ -6,9 +6,9 @@ organization := "edu.berkeley.cs"
 
 name := "f2_rx_dsp"
 
-version := scala.sys.process.Process("git rev-parse --short HEAD").!!.mkString.replaceAll("\\s", "")+"-SNAPSHOT"
+version := scala.sys.process.Process("git rev-parse --short HEAD").!!.mkString.replaceAll("\\s", "")
 
-scalaVersion := "2.11.11"
+scalaVersion := "2.12.3"
 
 // [TODO] what are these needed for? remove if obsolete
 def scalacOptionsVersion(scalaVersion: String): Seq[String] = {
@@ -41,7 +41,7 @@ def javacOptionsVersion(scalaVersion: String): Seq[String] = {
 // for those modules not version controlled by Maven or equivalent
 def gitSubmoduleHashSnapshotVersion(submod: String): String = {
     val shellcommand =  "git submodule status | grep %s | awk '{print substr($1,0,7)}'".format(submod)
-    scala.sys.process.Process(Seq("/bin/sh", "-c", shellcommand )).!!.mkString.replaceAll("\\s", "")+"-SNAPSHOT"
+    scala.sys.process.Process(Seq("/bin/sh", "-c", shellcommand )).!!.mkString.replaceAll("\\s", "")
 }
 
 
@@ -57,6 +57,7 @@ resolvers ++= Seq(
 )
 // [TODO]: Is this redundant?
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
+resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 
 // Provide a managed dependency on X if -DXVersion="" is supplied on the command line.
 // [TODO] is simpler clearer?
@@ -88,17 +89,10 @@ libraryDependencies  ++= Seq(
   "org.scalanlp" %% "breeze-viz" % "0.13.2"
 )
 
-//Needed by the rocket chip
-libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.2-SNAPSHOT"
-libraryDependencies += "berkeley" %% "rocketchip" % "1.2"
+libraryDependencies += "edu.berkeley.cs" %% "rocketchip" % "1.2-031419-SNAPSHOT"
 
-libraryDependencies += "edu.berkeley.cs" %% "f2_rx_path" % gitSubmoduleHashSnapshotVersion("f2_rx_path")
-libraryDependencies += "edu.berkeley.cs" %% "edge_detector" % gitSubmoduleHashSnapshotVersion("edge_detector")
-libraryDependencies += "edu.berkeley.cs" %% "dcpipe" % gitSubmoduleHashSnapshotVersion("dcpipe")
-libraryDependencies += "edu.berkeley.cs" %% "f2_signal_definitions" % gitSubmoduleHashSnapshotVersion("f2_signal_definitions")
-//libraryDependencies += "edu.berkeley.eecs" %% "ofdm" % "0.1"
-//libraryDependencies += "edu.berkeley.cs" %% "eagle_serdes" % "0.0-SNAPSHOT"
-
-// Put your git-version controlled snapshots here
-//libraryDependencies += "edu.berkeley.cs" %% "hbwif" % gitSubmoduleHashSnapshotVersion("hbwif")
+libraryDependencies += "Chisel-blocks" %% "f2_rx_path" % gitSubmoduleHashSnapshotVersion("f2_rx_path")
+libraryDependencies += "Chisel-blocks" %% "edge_detector" % gitSubmoduleHashSnapshotVersion("edge_detector")
+libraryDependencies += "Chisel-blocks" %% "dcpipe" % gitSubmoduleHashSnapshotVersion("dcpipe")
+libraryDependencies += "Chisel-blocks" %% "f2_signal_definitions" % gitSubmoduleHashSnapshotVersion("f2_signal_definitions")
 
